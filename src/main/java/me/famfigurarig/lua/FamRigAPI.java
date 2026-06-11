@@ -13,6 +13,7 @@ import java.util.List;
  *   FamRig.selectSkin(имя)  — применить скин (копирование файлов + авторелоад);
  *                             возвращает nil при успехе, иначе текст ошибки
  *   FamRig.openFolder(путь) — открыть проводник ("" = корень аватара, "skins" = каталог)
+ *   FamRig.skinIcon(имя)    — base64 PNG скина (skins/<имя>/skin.png) для превью-иконки
  *   FamRig.version()        — версия мода
  */
 @LuaWhitelist
@@ -44,8 +45,13 @@ public class FamRigAPI {
     }
 
     @LuaWhitelist
+    public static String skinIcon(String name) {
+        return SkinManager.skinBase64(name);
+    }
+
+    @LuaWhitelist
     public static String version() {
-        return "1.0.0";
+        return "1.0.1";
     }
 
     @Override

@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 
@@ -162,6 +163,23 @@ public final class SkinManager {
         if (!Files.exists(p)) return false;
         Util.getOperatingSystem().open(p.toFile());
         return true;
+    }
+
+    /**
+     * Base64 PNG-текстуры скина (skins/<имя>/skin.png) — для превью-иконки слота в колесе.
+     * Lua делает из неё текстуру через textures:read(name, base64). "" если файла нет.
+     * (Figura не грузит png из подпапок сама, поэтому отдаём байты через мод.)
+     */
+    public static String skinBase64(String name) {
+        Path dir = skinsDir();
+        if (dir == null || name == null || name.isEmpty()) return "";
+        Path png = dir.resolve(name).resolve("skin.png");
+        if (!Files.exists(png)) return "";
+        try {
+            return Base64.getEncoder().encodeToString(Files.readAllBytes(png));
+        } catch (IOException e) {
+            return "";
+        }
     }
 
     private static long mtime(Path p) {
