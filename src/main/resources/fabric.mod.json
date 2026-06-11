@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "famfigurarig",
+	"version": "${version}",
+	"name": "FamFiguraRig",
+	"description": "Каталог скинов на папках для Figura-рига Famose: выбор скина из колеса, авто-сохранение конфигов, открытие папок, оператор-надзор за сменами аватаров.",
+	"authors": [
+		"Famose"
+	],
+	"contact": {},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"me.famfigurarig.FamFiguraRig"
+		]
+	},
+	"mixins": [
+		"famfigurarig.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.0",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*",
+		"figura": "*"
+	}
+}
