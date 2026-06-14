@@ -50,8 +50,13 @@ public class FamRigAPI {
     }
 
     @LuaWhitelist
+    public static boolean syncActiveConfig() {
+        return SkinManager.syncActiveConfig();
+    }
+
+    @LuaWhitelist
     public static String version() {
-        return "1.0.1";
+        return "1.0.4";
     }
 
     @Override
