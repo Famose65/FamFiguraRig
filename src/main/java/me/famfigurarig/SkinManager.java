@@ -110,6 +110,31 @@ public final class SkinManager {
     }
 
     /**
+     * Скопировать config.json АКТИВНОГО скина → живой model_settings.json.
+     * Зовётся из Lua аватара ПРИ ЗАГРУЗКЕ (до чтения настроек) — гарантирует, что новый
+     * скин стартует со СВОИМ конфигом, даже если Figura при релоаде успела перезаписать
+     * model_settings.json старым конфигом (это происходит асинхронно во время загрузки,
+     * поэтому копирование из selectSkin ДО релоада не помогало). Возвращает true если скопировано.
+     */
+    public static boolean syncActiveConfig() {
+        String act = getActive();
+        Path dir = skinsDir();
+        if (act.isEmpty() || dir == null) return false;
+        Path slotCfg = dir.resolve(act).resolve(SLOT_CONFIG);
+        Path cfg = figuraConfigFile();
+        if (!Files.exists(slotCfg)) return false;
+        try {
+            Files.createDirectories(cfg.getParent());
+            Files.copy(slotCfg, cfg, StandardCopyOption.REPLACE_EXISTING);
+            lastConfigMtime = mtime(cfg);
+            return true;
+        } catch (IOException e) {
+            FiguraMod.LOGGER.error("[FamFiguraRig] syncActiveConfig '{}' не удалось", act, e);
+            return false;
+        }
+    }
+
+    /**
      * Выбрать скин: настройки текущего — в его папку; файлы слота — на рабочие места;
      * аватар перезагружается автоматически. Возвращает null при успехе, иначе текст ошибки.
      */
