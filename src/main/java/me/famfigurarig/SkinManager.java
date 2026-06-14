@@ -120,8 +120,10 @@ public final class SkinManager {
         if (name == null || name.isEmpty()) return "Не указано имя скина";
         Path slot = dir.resolve(name);
         if (!Files.isDirectory(slot)) return "Нет папки skins/" + name;
+        Path slotCfg = slot.resolve(SLOT_CONFIG);
+        Path cfg = figuraConfigFile();
         try {
-            // 1) настройки текущего скина — в его папку
+            // 1) настройки текущего скина (старый активный) — в его папку
             saveConfigToActive();
 
             // 2) текстуры слота — в корень аватара (файлы слота не изменяются)
@@ -132,32 +134,37 @@ public final class SkinManager {
             if (Files.exists(elements))
                 Files.copy(elements, a.resolve("skin_elements.png"), StandardCopyOption.REPLACE_EXISTING);
 
-            // 3) пометить активным (скрипт нового аватара стартует уже с новым активным)
-            setActive(name);
+            // 3) конфиг слота → живой конфиг (СРАЗУ, синхронно). У свежей папки конфига
+            //    ещё нет — она наследует текущий и получает его копию.
+            if (Files.exists(slotCfg)) {
+                Files.createDirectories(cfg.getParent());
+                Files.copy(slotCfg, cfg, StandardCopyOption.REPLACE_EXISTING);
+            } else if (Files.exists(cfg)) {
+                Files.copy(cfg, slotCfg, StandardCopyOption.REPLACE_EXISTING);
+            }
 
-            // 4) конфиг слота → живой конфиг И перезагрузка — ОБА в одном execute, прямо
-            //    перед loadLocalAvatar. КРИТИЧНО копировать конфиг ЗДЕСЬ, а не раньше:
-            //    старый аватар ещё жив между вызовом selectSkin и релоадом, и его Lua успевает
-            //    config:save → перезаписать model_settings.json СВОИМ конфигом, из-за чего
-            //    новый скин грузился со старым конфигом глаз/настроек. Avatar.clean() конфиг
-            //    не пишет, поэтому запись прямо перед loadLocalAvatar гарантированно доезжает.
+            // 4) пометить активным (синхронно, ПОСЛЕ saveConfigToActive — чтобы быстрый
+            //    следующий свитч сохранял свой конфиг в правильную папку).
+            setActive(name);
+            lastConfigMtime = mtime(cfg);
+
+            // 5) перезагрузка + ПОВТОРНОЕ копирование конфига ПРЯМО перед loadLocalAvatar.
+            //    Между вызовом selectSkin и релоадом старый аватар ещё жив и его Lua может
+            //    config:save → перезаписать model_settings.json своим конфигом. Avatar.clean()
+            //    конфиг не пишет, поэтому копия в самом execute гарантированно доезжает до
+            //    чтения новым аватаром. (Шаг 3 синхронный — на случай если execute задержится.)
+            final Path fSlotCfg = slotCfg, fCfg = cfg, fa = a;
             final String fname = name;
-            final Path fslot = slot;
-            final Path fa = a;
             MinecraftClient.getInstance().execute(() -> {
-                Path slotCfg = fslot.resolve(SLOT_CONFIG);
-                Path cfg = figuraConfigFile();
                 try {
-                    if (Files.exists(slotCfg)) {
-                        Files.createDirectories(cfg.getParent());
-                        Files.copy(slotCfg, cfg, StandardCopyOption.REPLACE_EXISTING);
-                    } else if (Files.exists(cfg)) {
-                        Files.copy(cfg, slotCfg, StandardCopyOption.REPLACE_EXISTING);
+                    if (Files.exists(fSlotCfg)) {
+                        Files.createDirectories(fCfg.getParent());
+                        Files.copy(fSlotCfg, fCfg, StandardCopyOption.REPLACE_EXISTING);
                     }
                 } catch (IOException ex) {
-                    FiguraMod.LOGGER.error("[FamFiguraRig] не смог применить конфиг скина '{}'", fname, ex);
+                    FiguraMod.LOGGER.error("[FamFiguraRig] повторное копирование конфига скина '{}' не удалось", fname, ex);
                 }
-                lastConfigMtime = mtime(cfg);
+                lastConfigMtime = mtime(fCfg);
                 AvatarManager.loadLocalAvatar(fa);
             });
             return null;
