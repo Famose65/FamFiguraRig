@@ -132,23 +132,34 @@ public final class SkinManager {
             if (Files.exists(elements))
                 Files.copy(elements, a.resolve("skin_elements.png"), StandardCopyOption.REPLACE_EXISTING);
 
-            // 3) конфиг слота — в живой конфиг Figura;
-            //    у свежей папки конфига ещё нет — она наследует текущий и получает его копию
-            Path slotCfg = slot.resolve(SLOT_CONFIG);
-            Path cfg = figuraConfigFile();
-            if (Files.exists(slotCfg)) {
-                Files.createDirectories(cfg.getParent());
-                Files.copy(slotCfg, cfg, StandardCopyOption.REPLACE_EXISTING);
-            } else if (Files.exists(cfg)) {
-                Files.copy(cfg, slotCfg, StandardCopyOption.REPLACE_EXISTING);
-            }
-
-            // 4) пометить активным (до релоада — скрипт стартует уже с новым активным)
+            // 3) пометить активным (скрипт нового аватара стартует уже с новым активным)
             setActive(name);
-            lastConfigMtime = mtime(cfg);
 
-            // 5) полная перезагрузка аватара — автоматически, на клиентском потоке
-            MinecraftClient.getInstance().execute(() -> AvatarManager.loadLocalAvatar(a));
+            // 4) конфиг слота → живой конфиг И перезагрузка — ОБА в одном execute, прямо
+            //    перед loadLocalAvatar. КРИТИЧНО копировать конфиг ЗДЕСЬ, а не раньше:
+            //    старый аватар ещё жив между вызовом selectSkin и релоадом, и его Lua успевает
+            //    config:save → перезаписать model_settings.json СВОИМ конфигом, из-за чего
+            //    новый скин грузился со старым конфигом глаз/настроек. Avatar.clean() конфиг
+            //    не пишет, поэтому запись прямо перед loadLocalAvatar гарантированно доезжает.
+            final String fname = name;
+            final Path fslot = slot;
+            final Path fa = a;
+            MinecraftClient.getInstance().execute(() -> {
+                Path slotCfg = fslot.resolve(SLOT_CONFIG);
+                Path cfg = figuraConfigFile();
+                try {
+                    if (Files.exists(slotCfg)) {
+                        Files.createDirectories(cfg.getParent());
+                        Files.copy(slotCfg, cfg, StandardCopyOption.REPLACE_EXISTING);
+                    } else if (Files.exists(cfg)) {
+                        Files.copy(cfg, slotCfg, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } catch (IOException ex) {
+                    FiguraMod.LOGGER.error("[FamFiguraRig] не смог применить конфиг скина '{}'", fname, ex);
+                }
+                lastConfigMtime = mtime(cfg);
+                AvatarManager.loadLocalAvatar(fa);
+            });
             return null;
         } catch (IOException e) {
             return "Ошибка копирования: " + e.getMessage();
